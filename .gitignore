@@ -1,0 +1,26 @@
+# 运行产物
+01_crawler/data/*.db
+01_crawler/data/*.db-wal
+01_crawler/data/*.db-shm
+01_crawler/data/raw/
+01_crawler/data/corpus/
+01_crawler/data/reports/
+01_crawler/data/logs/
+01_crawler/data/manual_captcha/
+02_rag/data/faiss/
+02_rag/data/*.log
+02_rag/data/manual_captcha/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 环境与编辑器
+.env
+.idea/
+.vscode/
+*.swp
+.DS_Store

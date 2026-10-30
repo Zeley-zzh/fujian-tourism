@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}概览{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Fujian Culture &amp; Tourism · Knowledge Base</div>
+  <h1>从公开公文里抽出可核验的景区事实</h1>
+  <p class="lead">
+    政策原文进库、字段逐条挂溯源、过期与冲突不隐藏。问答环节只陈述有出处的句子，
+    没查到就说没查到。
+  </p>
+</header>
+
+<div class="statusline">
+  {% if llm.configured %}
+    <span><span class="dot"></span>模型已接入 · {{ llm.model }}</span>
+  {% else %}
+    <span><span class="dot off"></span>未接入模型 · 当前用本地摘录作答（可在「配置」页填 Key 启用）</span>
+  {% endif %}
+  <span>索引 {{ index.total or 0 }} 向量{% if index.model %} · {{ index.model }}{% endif %}</span>
+  {% if index_note %}<span>{{ index_note }}</span>{% endif %}
+</div>
+
+<div class="kpi">
+  <div class="cell"><div class="num">{{ stats.documents or 0 }}</div><div class="cap">入库公文</div></div>
+  <div class="cell"><div class="num">{{ stats.chunks or 0 }}</div><div class="cap">检索切片</div></div>
+  <div class="cell"><div class="num">{{ stats.spots or 0 }}</div><div class="cap">景区条目</div></div>
+  <div class="cell"><div class="num ok">{{ stats.verified or 0 }}</div><div class="cap">已核验字段</div></div>
+  <div class="cell"><div class="num warn">{{ stats.pending or 0 }}</div><div class="cap">待核验字段</div></div>
+  <div class="cell"><div class="num conflict">{{ stats.conflicts or 0 }}</div><div class="cap">冲突字段</div></div>
+</div>
+
+<h2>景区</h2>
+<p class="hint">状态取该景区全部字段的合并结果：有任一字段冲突即标冲突，全部核验才算已核验。</p>
+
+{% if spots %}
+<div class="panel panel--flush">
+  <table>
+    <thead>
+      <tr><th>景区</th><th>等级 / 类别</th><th>城市</th><th>字段</th><th>状态</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for s in spots %}
+      <tr>
+        <td><a href="/spot/{{ s.spot_id }}">{{ s.name }}</a></td>
+        <td>{{ s.rank or '—' }}</td>
+        <td>{{ s.city or '—' }}</td>
+        <td class="mono">{{ s.field_count }}</td>
+        <td>
+          <span class="tag {{ 'conflict' if s.status=='冲突' else ('ok' if s.status=='已核验' else 'warn') }}">{{ s.status }}</span>
+          {% if s.conflict_count %}<span class="hint">{{ s.conflict_count }} 处冲突</span>{% endif %}
+        </td>
+        <td><a href="/spot/{{ s.spot_id }}">详情 →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">库内还没有景区条目。跑完采集与清洗后，这里会列出从公文里识别出的景区。</p>
+{% endif %}
+
+<h2>最近入库</h2>
+{% if docs %}
+<div class="panel panel--flush">
+  <table>
+    <thead><tr><th>标题</th><th>发文机关</th><th>发布日期</th><th>版本</th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+      <tr>
+        <td><a href="/doc/{{ d.doc_id }}">{{ d.title }}</a></td>
+        <td>{{ d.issuer or '—' }}</td>
+        <td class="mono">{{ d.publish_date or '—' }}</td>
+        <td class="mono">v{{ d.current_version }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">还没有文档。</p>
+{% endif %}
+
+<h2>直接问</h2>
+<p class="hint">回答里的每个 [n] 都对应下面的来源片段，可以点开原文核对。</p>
+<div class="panel">
+  <form method="post" action="/ask">
+    <div class="field-row">
+      <textarea name="question" placeholder="例如：4A 级旅游景区的评定标准是什么？" required></textarea>
+    </div>
+    <button class="btn" type="submit">开始检索 <span class="orb">→</span></button>
+  </form>
+</div>
+
+{% endblock %}

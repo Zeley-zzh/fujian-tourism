@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}景区名录{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Scenic Spots</div>
+  <h1>景区名录与字段状态</h1>
+  <p class="lead">
+    每条记录来自公告原文中的景区名单，开放时间、票价等字段另按公文正文抽取。
+    状态为三态：已核验、待核验、冲突。
+  </p>
+</header>
+
+<form method="get" action="/spots" class="panel" style="margin-bottom:22px">
+  <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end">
+    <div>
+      <label style="display:block;font-size:12px;letter-spacing:.08em;color:var(--ink-3);margin-bottom:8px">城市</label>
+      <select name="city">
+        <option value="">全部城市</option>
+        {% for c in cities %}
+        <option value="{{ c }}" {{ 'selected' if c==city }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;letter-spacing:.08em;color:var(--ink-3);margin-bottom:8px">字段状态</label>
+      <select name="status">
+        <option value="">全部状态</option>
+        {% for s in ['已核验','待核验','冲突'] %}
+        <option value="{{ s }}" {{ 'selected' if s==status }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn" type="submit">筛选 <span class="orb">→</span></button>
+  </div>
+</form>
+
+<p class="hint">共 {{ total }} 条，当前显示 {{ spots|length }} 条。</p>
+
+{% if spots %}
+<div class="panel panel--flush">
+  <table>
+    <thead>
+      <tr><th>景区</th><th>等级 / 类别</th><th>城市</th><th>地址</th><th>字段</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+    {% for s in spots %}
+      <tr>
+        <td><a href="/spot/{{ s.spot_id }}">{{ s.name }}</a></td>
+        <td>{{ s.rank or '—' }}</td>
+        <td>{{ s.city or '—' }}</td>
+        <td class="hint">{{ s.address or '—' }}</td>
+        <td class="mono">{{ s.field_count }}</td>
+        <td>
+          <span class="tag {{ 'conflict' if s.status=='冲突' else ('ok' if s.status=='已核验' else 'warn') }}">{{ s.status }}</span>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">没有匹配的景区。换一个城市或状态试试。</p>
+{% endif %}
+
+{% endblock %}

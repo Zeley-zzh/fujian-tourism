@@ -1,0 +1,10 @@
+{
+  "provider": "deepseek",
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "api_key": "",
+  "temperature": 0.2,
+  "max_tokens": 900,
+  "embedding_backend": "st",
+  "embedding_model": "BAAI/bge-small-zh-v1.5"
+}

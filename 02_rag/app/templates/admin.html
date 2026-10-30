@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}模型配置{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Admin · Model</div>
+  <h1>模型与向量后端</h1>
+  <p class="lead">
+    填一次 API Key，访客页的问答立刻改用模型作答。保存后无需重启服务。
+    配置落在本机 <span class="mono">{{ cfg.config_path }}</span>，页面只回显掩码。
+  </p>
+</header>
+
+{% if saved %}
+<div class="statusline" style="box-shadow:inset 0 0 0 1px var(--jade-soft)">
+  <span><span class="dot"></span>配置已保存并生效</span>
+  {% if rebuilt %}<span>索引：{{ rebuilt }}</span>{% endif %}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="statusline" style="box-shadow:inset 0 0 0 1px var(--crimson-soft)">
+  <span style="color:var(--crimson)">保存失败：{{ error }}</span>
+</div>
+{% endif %}
+
+<div class="panel">
+  <form method="post" action="/admin">
+
+    <div class="field-row">
+      <label for="provider">服务商</label>
+      <select id="provider" name="provider">
+        {% for key, p in cfg.providers.items() %}
+        <option value="{{ key }}" {{ 'selected' if key==cfg.provider }}>{{ p.label }}</option>
+        {% endfor %}
+      </select>
+      <div class="note">选择后自动填默认地址与模型名；自定义时填任意 OpenAI 兼容端点。</div>
+    </div>
+
+    <div class="field-row">
+      <label for="base_url">接口地址</label>
+      <input id="base_url" name="base_url" type="text" value="{{ cfg.base_url }}" placeholder="https://api.deepseek.com/v1">
+    </div>
+
+    <div class="field-row">
+      <label for="model">模型名</label>
+      <input id="model" name="model" type="text" value="{{ cfg.model }}" placeholder="deepseek-chat">
+    </div>
+
+    <div class="field-row">
+      <label for="api_key">API Key</label>
+      <input id="api_key" name="api_key" type="password"
+             placeholder="{% if cfg.api_key_set %}当前 {{ cfg.api_key_mask }}（留空表示不修改）{% else %}sk-...{% endif %}">
+      <div class="note">
+        只存在本机配置文件里，页面与接口都只返回掩码。
+        {% if cfg.api_key_set %}当前已配置：<span class="mono">{{ cfg.api_key_mask }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="field-row">
+        <label for="temperature">temperature</label>
+        <input id="temperature" name="temperature" type="number" step="0.1" min="0" max="1.5" value="{{ cfg.temperature }}">
+      </div>
+      <div class="field-row">
+        <label for="max_tokens">max_tokens</label>
+        <input id="max_tokens" name="max_tokens" type="number" step="50" min="100" max="4000" value="{{ cfg.max_tokens }}">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <label for="embedding_backend">向量后端</label>
+      <select id="embedding_backend" name="embedding_backend">
+        <option value="st" {{ 'selected' if cfg.embedding_backend=='st' }}>语义模型（sentence-transformers）</option>
+        <option value="hash" {{ 'selected' if cfg.embedding_backend=='hash' }}>内置字符 n-gram（不下载权重）</option>
+      </select>
+      <div class="note">换后端会让旧索引失效，保存后自动重建。语义模型首次加载要下载权重，约 100MB。</div>
+    </div>
+
+    <div class="field-row">
+      <label for="embedding_model">向量模型名</label>
+      <input id="embedding_model" name="embedding_model" type="text" value="{{ cfg.embedding_model }}" placeholder="BAAI/bge-small-zh-v1.5">
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <button class="btn" type="submit">保存并生效 <span class="orb">→</span></button>
+    </div>
+  </form>
+</div>
+
+<h2>当前状态</h2>
+<div class="panel panel--flush">
+  <table>
+    <tbody>
+      <tr><td>模型接入</td><td>
+        {% if llm.configured %}
+          <span class="tag ok">已配置</span> {{ llm.model }}
+        {% else %}
+          <span class="tag warn">未配置</span> 访客页用本地摘录作答
+        {% endif %}
+      </td></tr>
+      <tr><td>Key</td><td class="mono">{{ llm.api_key_mask or '—' }}</td></tr>
+      <tr><td>接口地址</td><td class="mono">{{ llm.base_url }}</td></tr>
+      <tr><td>向量索引</td><td>
+        {% if index and index.ready %}
+          <span class="tag ok">就绪</span> {{ index.total }} 向量 · {{ index.model }} · {{ index.dim }} 维
+        {% else %}
+          <span class="tag warn">需重建</span> {{ index.note if index else '' }}
+        {% endif %}
+      </td></tr>
+      <tr><td>库内</td><td>
+        文档 {{ stats.documents or 0 }} · 切片 {{ stats.chunks or 0 }} · 景区 {{ stats.spots or 0 }} · 字段 {{ stats.provenance or 0 }}
+      </td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>操作</h2>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+  <form method="post" action="/admin/test" style="display:inline">
+    <button class="btn ghost" type="submit">测试模型连接</button>
+  </form>
+  <form method="post" action="/admin/reindex" style="display:inline">
+    <button class="btn ghost" type="submit">重建向量索引</button>
+  </form>
+</div>
+<p class="hint">
+  「测试连接」会真实调用一次模型；失败时返回具体错误，不会假装成功。
+  重建索引在当前语料上大约十几秒。
+</p>
+
+{% if cfg.api_key_set %}
+<h2>清除凭据</h2>
+<div class="panel">
+  <form method="post" action="/admin">
+    <input type="hidden" name="clear_key" value="1">
+    <input type="hidden" name="provider" value="{{ cfg.provider }}">
+    <input type="hidden" name="base_url" value="{{ cfg.base_url }}">
+    <input type="hidden" name="model" value="{{ cfg.model }}">
+    <input type="hidden" name="temperature" value="{{ cfg.temperature }}">
+    <input type="hidden" name="max_tokens" value="{{ cfg.max_tokens }}">
+    <input type="hidden" name="embedding_backend" value="{{ cfg.embedding_backend }}">
+    <input type="hidden" name="embedding_model" value="{{ cfg.embedding_model }}">
+    <p class="hint" style="margin-top:0">清掉 Key 后问答会退回本地摘录模式，其余功能不受影响。</p>
+    <button class="btn ghost" type="submit">清除 API Key</button>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

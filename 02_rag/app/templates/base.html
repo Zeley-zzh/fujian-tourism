@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}知识库{% endblock %} · 福建文旅政策与景区</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="nav-wrap">
+  <nav class="nav">
+    <a class="brand" href="/">福建文旅知识库<span class="sub">Policy &amp; Scenic</span></a>
+    <a class="item {{ 'active' if active=='home' }}" href="/">概览</a>
+    <a class="item {{ 'active' if active=='spots' }}" href="/spots">景区</a>
+    <a class="item {{ 'active' if active=='ask' }}" href="/ask">问答</a>
+    <span class="sep"></span>
+    <a class="item {{ 'active' if active=='admin' }}" href="/admin">配置</a>
+  </nav>
+</div>
+
+<div class="shell">
+  {% block body %}{% endblock %}
+
+  <footer class="foot">
+    <span>数据来源：福建省文化和旅游厅公开文件，逐条可溯源到原文</span>
+    <span>
+      库内 {{ stats.documents or 0 }} 篇 · {{ stats.chunks or 0 }} 切片
+      {% if llm.configured %}· 模型 {{ llm.model }}{% else %}· 未接入模型{% endif %}
+    </span>
+  </footer>
+</div>
+
+</body>
+</html>

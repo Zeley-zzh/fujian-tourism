@@ -1,0 +1,10 @@
+httpx>=0.27
+fastapi>=0.110
+uvicorn[standard]>=0.29
+jinja2>=3.1
+python-multipart>=0.0.9
+numpy>=1.26
+faiss-cpu>=1.8
+
+# 可选：想要更好的语义召回时安装（体积大，需下载模型权重）
+# sentence-transformers>=2.7

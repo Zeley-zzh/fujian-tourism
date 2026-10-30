@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ spot.name }}{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Scenic Spot</div>
+  <h1>{{ spot.name }}</h1>
+  <p class="lead">
+    {{ spot.city or '城市未知' }}{% if spot.level %} · {{ spot.level }} 级{% endif %}
+    {% if spot.county %} · {{ spot.county }}{% endif %}
+    {% if spot.address %} · {{ spot.address }}{% endif %}
+  </p>
+</header>
+
+<h2>字段与溯源</h2>
+<p class="hint">每个值都挂着来源。冲突字段不合并，两个取值并排显示，等人工确认后才会收敛为一个。</p>
+
+{% for f in fields %}
+<div class="field {{ 'conflict' if f.is_conflict }}">
+  <div class="field-head">
+    <span class="label">{{ f.label }}</span>
+    <span class="val">{{ f.current }}</span>
+    <span class="tag {{ f.status_class }}">{{ f.status }}</span>
+    {% if f.is_conflict %}<span class="tag conflict">存在 {{ f['values']|length }} 个不同取值</span>{% endif %}
+  </div>
+
+  {% if f.is_conflict %}
+  <ul class="values">
+    {% for v in f['values'] %}
+    <li>
+      <span class="v">{{ v.value }}</span>
+      <span class="tag {{ v.status_class }}">{{ v.status }}</span>
+      <span class="hint">{{ v.doc_title }}{% if v.publish_date %} · 发布 {{ v.publish_date }}{% endif %}{% if v.effective_to %} · 有效期至 {{ v.effective_to }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <details class="src">
+    <summary>来源（{{ f['values']|length }} 条证据）</summary>
+    <div class="src-body">
+      {% for v in f['values'] %}
+      <dl>
+        <dt>字段值</dt><dd><strong>{{ v.value }}</strong> <span class="tag {{ v.status_class }}">{{ v.status }}</span></dd>
+        <dt>文档</dt><dd>{{ v.doc_title }}</dd>
+        <dt>发文机关</dt><dd>{{ v.issuer or '—' }}</dd>
+        <dt>发布日期</dt><dd class="mono">{{ v.publish_date or '—' }}</dd>
+        <dt>生效区间</dt><dd class="mono">{{ v.effective_from or '不限' }} ~ {{ v.effective_to or '不限' }}</dd>
+        <dt>抓取时间</dt><dd class="mono">{{ v.fetched_at or '—' }}</dd>
+        <dt>原文摘录</dt>
+        <dd>{% if v.quote %}<div class="quote">{{ v.quote }}</div>{% else %}<span class="tag warn">缺少摘录</span>{% endif %}</dd>
+        <dt>原文链接</dt><dd><a href="{{ v.source_url }}" target="_blank" rel="noopener">查看原文</a></dd>
+        <dt>文档详情</dt><dd><a href="/doc/{{ v.source_doc_id }}">{{ v.source_doc_id }} →</a></dd>
+      </dl>
+      {% if not loop.last %}<hr style="border:none;border-top:1px dashed var(--line);margin:16px 0">{% endif %}
+      {% endfor %}
+    </div>
+  </details>
+</div>
+{% endfor %}
+
+{% if conflicts %}
+<h2>冲突与变更对比</h2>
+<p class="hint">系统没有自动合并。下面列出每个冲突字段的全部取值，以及对应文档最近一次的正文变更摘要。</p>
+{% for c in conflicts %}
+<div class="panel" style="margin-top:14px">
+  <h3 style="margin-top:0">{{ c['field_name'] }} · {{ c['values']|join(' / ') }}</h3>
+  <table>
+    <thead>
+      <tr><th>取值</th><th>状态</th><th>来源文档</th><th>发布日期</th><th>生效至</th><th>最近变更</th></tr>
+    </thead>
+    <tbody>
+    {% for it in c['items'] %}
+      <tr>
+        <td><strong>{{ it.field_value }}</strong></td>
+        <td><span class="tag {{ 'conflict' if it.status=='冲突' else ('ok' if it.status=='已核验' else 'warn') }}">{{ it.status }}</span></td>
+        <td><a href="/doc/{{ it.source_doc_id }}">{{ it.doc_title }}</a></td>
+        <td class="mono">{{ it.publish_date or '—' }}</td>
+        <td class="mono">{{ it.effective_to or '不限' }}</td>
+        <td>{% if it.latest_diff %}<div class="diff">{{ it.latest_diff }}</div>{% else %}<span class="hint">该文档只有 1 个版本</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>关联政策</h2>
+{% if docs %}
+<div class="panel panel--flush">
+  <table>
+    <thead><tr><th>文档</th><th>关系</th><th>置信度</th><th>发布日期</th><th>依据</th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+      <tr>
+        <td><a href="/doc/{{ d.doc_id }}">{{ d.title }}</a></td>
+        <td><span class="tag neutral">{{ d.relation }}</span></td>
+        <td class="mono">{{ '%.2f'|format(d.confidence) }}</td>
+        <td class="mono">{{ d.publish_date or '—' }}</td>
+        <td class="hint">{{ d.evidence or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">没有关联到政策文档。</p>
+{% endif %}
+
+<div class="chips" style="margin-top:30px">
+  <a class="chip" href="/ask?q={{ spot.name }}">针对该景区提问</a>
+  <a class="chip" href="/spots">返回名录</a>
+</div>
+
+{% endblock %}

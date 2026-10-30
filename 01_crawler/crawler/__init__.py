@@ -1,0 +1,5 @@
+"""01_crawler 包入口。"""
+from __future__ import annotations
+
+__version__ = "1.0.0"
+__all__ = ["config", "utils", "anticrawl", "parsers", "pipeline", "db"]

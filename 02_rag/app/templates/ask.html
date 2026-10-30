@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}检索问答{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Ask</div>
+  <h1>用公文原文回答问题</h1>
+  <p class="lead">
+    检索走向量与字面双路，回答里的每个 [n] 都指向一段可点开的原文。
+    {% if llm.configured %}当前由 {{ llm.model }} 组织语言。{% else %}当前未接入模型，回答由原文摘录直接拼装。{% endif %}
+  </p>
+</header>
+
+<div class="panel">
+  <form method="post" action="/ask">
+    <div class="field-row">
+      <label for="q">问题</label>
+      <textarea id="q" name="question" placeholder="例如：省级旅游度假区的评定需要满足哪些条件？" required>{{ question or '' }}</textarea>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div style="flex:0 0 140px">
+        <label for="k" style="display:block;font-size:12px;letter-spacing:.08em;color:var(--ink-3);margin-bottom:8px">引用片段数</label>
+        <select id="k" name="top_k">
+          {% for n in [3,5,8] %}
+          <option value="{{ n }}" {{ 'selected' if n==5 }}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn" type="submit" style="margin-top:22px">检索并作答 <span class="orb">→</span></button>
+    </div>
+  </form>
+</div>
+
+{% if result %}
+  <h2>回答</h2>
+  <div class="statusline">
+    {% if result.mode == 'live' %}
+      <span><span class="dot"></span>模型作答 · {{ result.model }}</span>
+    {% else %}
+      <span><span class="dot off"></span>{{ result.badge }}</span>
+    {% endif %}
+    <span>命中 {{ result.used_chunks }} 段</span>
+    <span class="mono">{{ result.latency_ms }} ms</span>
+    {% if result.error %}<span>调用异常：{{ result.error }}</span>{% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="answer">{{ result.answer }}</div>
+  </div>
+
+  {% if result.citations %}
+  <h2>引用来源</h2>
+  <p class="hint">编号与上文回答里的 [n] 一一对应。点开原文可以自行核对。</p>
+  <div class="panel">
+    {% for c in result.citations %}
+    <div class="cite">
+      <div>
+        <span class="idx">{{ c.index }}</span>
+        <span class="title">{{ c.doc_title }}</span>
+        {% if c.doc_no %}<span class="tag neutral">{{ c.doc_no }}</span>{% endif %}
+      </div>
+      <div class="meta">
+        {{ c.issuer or '发文机关不详' }}
+        {% if c.publish_date %} · 发布 {{ c.publish_date }}{% endif %}
+        {% if c.effective_to %} · 有效期至 {{ c.effective_to }}{% endif %}
+        {% if c.heading_path %} · {{ c.heading_path }}{% endif %}
+        · 相关度 {{ '%.3f'|format(c.score) }}
+      </div>
+      <div class="q">{{ c.quote }}{% if c.quote|length >= 200 %}…{% endif %}</div>
+      <div class="meta" style="margin-bottom:0">
+        <a href="/doc/{{ c.doc_id }}">库内全文 {{ c.doc_id }}</a>
+        {% if c.url %} · <a href="{{ c.url }}" target="_blank" rel="noopener">政府网站原文</a>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endif %}
+
+<h2>可以这样问</h2>
+<div class="chips">
+  <a class="chip" href="/ask?q=4A级旅游景区的评定标准">4A 级旅游景区的评定标准</a>
+  <a class="chip" href="/ask?q=省级旅游度假区名单">省级旅游度假区名单</a>
+  <a class="chip" href="/ask?q=旅游景区质量等级如何划分">旅游景区质量等级如何划分</a>
+  <a class="chip" href="/ask?q=智慧景区建设要求">智慧景区建设要求</a>
+</div>
+
+{% endblock %}

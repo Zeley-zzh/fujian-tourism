@@ -1,0 +1,141 @@
+# ============================================================
+# 采集配置。换站点只改这里 + 加一个解析器，抓取/入库/清洗不动。
+# 当前指向福建省文化和旅游厅政府信息公开栏目（公开数据）。
+# ============================================================
+project:
+  name: fujian-tourism-crawler
+  data_dir: data
+  db_path: data/tourism.db
+  raw_dir: data/raw
+  corpus_dir: data/corpus
+  report_dir: data/reports
+  log_dir: data/logs
+  user_agent_rotate: true
+  respect_robots: true            # 读 robots.txt 与 Crawl-delay
+  bypass_mode: false              # true 时启用指纹伪装 + 代理池 + 验证码识别（CLI --bypass）
+
+throttle:
+  # 单域名并发 1，平均 3 秒一次；政务站不是高并发场景，慢一点也不会被封
+  per_host_concurrency: 1
+  min_interval_sec: 2.0
+  max_interval_sec: 4.5           # 随机抖动上限，固定节奏本身就是机器人特征
+  burst_limit: 3                  # 连续 N 个请求后强制长睡
+  burst_sleep_sec: 15
+  max_retries: 4
+  backoff_base: 1.8               # 指数退避：base ** attempt × jitter
+  timeout_sec: 25
+  max_requests_per_run: 900       # 单次运行的总请求预算（列表页也算在内）
+  detail_limit: 150               # 单次运行最多抓多少篇详情，其余留给增量任务
+
+proxy:
+  enabled: false
+  providers: []
+  # 例：- "http://user:pass@127.0.0.1:7897"
+  #     - "socks5://127.0.0.1:1080"
+  health_check_url: "http://httpbin.org/ip"
+  health_check_interval_sec: 120
+  max_fail_count: 3
+  rotate: per_request             # per_request | per_session | sticky_5min
+
+fingerprint:
+  impersonate: "chrome124"        # curl_cffi 的 TLS/HTTP2 指纹档位
+  header_order_profile: chrome
+  enable_http2: true
+
+captcha:
+  enabled: true
+  engine: ddddocr                 # ddddocr | manual | remote_api
+  remote_api: ""
+  max_attempts: 5
+
+parsers:
+  default: wlt_gov
+
+sites:
+  - key: fj_wlt
+    name: 福建省文化和旅游厅
+    base_url: "https://wlt.fujian.gov.cn"
+    parser: wlt_gov
+    doc_type: policy
+    # 栏目页由 avalon.js 渲染，HTML 里没有列表文本；真实数据来自 WAS5 检索接口。
+    # 响应头写 text/html，正文却是 JSON，且含裸控制字符 —— 解析时必须 strict=False。
+    api:
+      url: "https://wlt.fujian.gov.cn/was5/web/search"
+      channelid: "256730"          # = 页面 SiteInfo.was4doc
+      templet: "advsch.jsp"
+      sortfield: "-docorderpri,-docreltime"
+      prepage: 50
+      referer: "https://wlt.fujian.gov.cn/zwgk/zcfg/"
+    channels:
+      - key: zcfg
+        name: 政策法规
+        page_url: "https://wlt.fujian.gov.cn/zwgk/zcfg/"
+        classsql: "parentid,chnlid+=55443,55444,55445,37577"
+        doc_type: policy
+        max_pages: 8
+      - key: tzgg
+        name: 通知公告
+        page_url: "https://wlt.fujian.gov.cn/zwgk/tzgg/"
+        classsql: "parentid,chnlid+=37547,37549,37564,37546"
+        doc_type: notice
+        max_pages: 20
+      - key: zfxxgkml
+        name: 政府信息公开目录
+        page_url: "https://wlt.fujian.gov.cn/zfxxgkzl/zfxxgkml/"
+        classsql: "(chnlid=37787,37788,37789,37790,37793,37794,37791,37795,37797,37798,37799,37800,37801,37802,37803,37804,59812,37805,37806,37807,37808,37809)*modal=1"
+        doc_type: policy
+        max_pages: 10
+    detail_selector:
+      # 两套模板：新版（政府信息公开）与旧版（政策法规）。按顺序试，取文本最长的。
+      title: ["h1", "h2", "div.article_title"]
+      body:
+        - "div.article_content.article_content_01"
+        - "div.article_content"
+        - "div.TRS_Editor"
+        - "div.detp"
+        - "div.word_con"
+        - "div.article_area"
+      strip: ["div.dybox", "div.dyy_box", "div.xglj_box", "div.article_source_col",
+              "div.share", "div.related", "div.pagination", "script", "style"]
+      source: "div.article_source_col"
+
+    # 指定抓取：排在列表之前，不受分页深度限制。
+    # 用途是「已知高价值的少数几篇」——景区名录类公告发布时间早、在列表里排得很后，
+    # 靠翻页要翻几十页才遇到；直接给定 URL 最省请求。
+    seed_urls:
+      - url: "http://wlt.fujian.gov.cn/zwgk/tzgg/gggs/202212/t20221229_6084950.htm"
+        doc_type: notice   # 2022 年 4A 级旅游景区、省级旅游度假区名单公告
+      - url: "http://wlt.fujian.gov.cn/zwgk/tzgg/gggs/202105/t20210506_5589261.htm"
+        doc_type: notice   # 福建省旅游度假区名单（截止 2020-12-30）
+      - url: "http://wlt.fujian.gov.cn/zfxxgkzl/zfxxgkml/02fggzhgfxwj/202506/t20250613_6927056.htm"
+        doc_type: policy   # 福建省旅游景区质量等级管理办法
+
+scenic_fields:
+  # 易变字段 → 抽取规则；命中即写入 field_provenance 并带原文摘录
+  opening_hours:
+    keywords: ["开放时间", "营业时间", "游览时间"]
+    regex: "(\\d{1,2}[:：]\\d{2})\\s*[—\\-~至]\\s*(\\d{1,2}[:：]\\d{2})"
+  ticket_price:
+    keywords: ["门票", "票价", "价格"]
+    regex: "(\\d+(?:\\.\\d+)?)\\s*元"
+  booking_method:
+    keywords: ["预约", "购票方式", "实名"]
+  phone:
+    keywords: ["咨询电话", "联系电话", "服务热线"]
+    regex: "((?:0\\d{2,3}[-—]?)?\\d{7,8}|1[3-9]\\d{9})"
+  address:
+    keywords: ["地址", "位于"]
+    # 只能吃「行政区划 + 道路/乡镇村 + 门牌」这一段。
+    # 没有正则时按句末截取，会把「位于漳州龙海区隆教畲族乡，冬暖夏凉，
+    # 四季宜人，享有『东方夏威夷』的美誉」整句当成地址——那是介绍不是地址。
+    # 两个分支：带门牌号的优先，没有门牌号就停在道路/乡镇村。
+    regex: "[\\u4e00-\\u9fa5]{2,12}(?:省|市|区|县)[\\u4e00-\\u9fa5\\s0-9]{0,20}?(?:(?:路|街|大道|大街|镇|乡|村|社区)[\\u4e00-\\u9fa5\\s0-9]{0,12}号|(?:路|街|大道|大街|镇|乡|村|社区))"
+  policy_validity:
+    keywords: ["有效期", "执行期", "施行"]
+    regex: "自\\s*\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日\\s*起[^。；]{0,30}|有效期至\\s*\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日"
+
+chunking:
+  # 与 02_rag 侧保持一致，避免两端切法不同导致引用错位
+  chunk_size: 480
+  overlap: 80
+  min_chunk_chars: 60

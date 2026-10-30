@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Document</div>
+  <h1>{{ doc.title }}</h1>
+  <p class="lead">
+    {{ doc.issuer or '发文机关不详' }}
+    {% if doc.doc_no %} · {{ doc.doc_no }}{% endif %}
+    {% if doc.publish_date %} · 发布 {{ doc.publish_date }}{% endif %}
+    {% if doc.effective_from %} · 生效 {{ doc.effective_from }}{% endif %}
+    {% if doc.effective_to %} · 有效期至 {{ doc.effective_to }}{% endif %}
+  </p>
+</header>
+
+<div class="statusline">
+  <span><span class="dot"></span>当前版本 v{{ doc.current_version }}</span>
+  <span>切片 {{ chunks|length }} 段</span>
+  <span>作为证据支撑 {{ prov|length }} 个字段</span>
+  <span><a href="{{ doc.url }}" target="_blank" rel="noopener">政府网站原文 ↗</a></span>
+</div>
+
+{% if content_text %}
+<h2>正文</h2>
+<div class="panel">
+  <div class="answer" style="font-size:15px;line-height:1.95">{{ content_text }}</div>
+</div>
+{% else %}
+<h2>正文</h2>
+<p class="empty">
+  这篇文档的正文是图片或纯附件，没有可直接检索的文字。
+  {% if raw_path %}<span class="mono">原始文件：{{ raw_path }}</span>{% endif %}
+</p>
+{% endif %}
+
+<h2>版本历史</h2>
+<p class="hint">正文内容哈希变化才会升版本。下面是最新在前的变更摘要。</p>
+<div class="panel panel--flush">
+  <table>
+    <thead><tr><th>版本</th><th>抓取时间</th><th>正文变更</th></tr></thead>
+    <tbody>
+    {% for v in versions %}
+      <tr>
+        <td class="mono">v{{ v.version_no }}</td>
+        <td class="mono">{{ v.fetched_at or '—' }}</td>
+        <td><div class="diff">{{ v.diff_summary or '—' }}</div></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3" class="hint">这篇文档只有 1 个版本，从未发生过正文变更。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if prov %}
+<h2>该文档提供的字段证据</h2>
+<div class="panel panel--flush">
+  <table>
+    <thead><tr><th>景区</th><th>字段</th><th>取值</th><th>状态</th><th>原文摘录</th></tr></thead>
+    <tbody>
+    {% for p in prov %}
+      <tr>
+        <td><a href="/spot/{{ p.spot_id }}">{{ p.spot_name }}</a></td>
+        <td>{{ p.field_name }}</td>
+        <td><strong>{{ p.field_value }}</strong></td>
+        <td><span class="tag {{ 'conflict' if p.status=='冲突' else ('ok' if p.status=='已核验' else 'warn') }}">{{ p.status }}</span></td>
+        <td class="hint">{{ p.quote or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>切片</h2>
+<p class="hint">检索的最小单位。切片不跨小标题，短于阈值的块会并回上一块。</p>
+{% if chunks %}
+<div class="panel panel--flush">
+  <table>
+    <thead><tr><th>编号</th><th>小标题</th><th>字符</th><th>预估 token</th></tr></thead>
+    <tbody>
+    {% for c in chunks %}
+      <tr>
+        <td class="mono">{{ c.chunk_id }}</td>
+        <td>{{ c.heading_path or '—' }}</td>
+        <td class="mono">{{ c.text|length }}</td>
+        <td class="mono">{{ (c.token_estimate or 0)|round|int }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">这篇文档还没有切片，跑一次清洗即可生成。</p>
+{% endif %}
+
+<div class="chips" style="margin-top:30px">
+  <a class="chip" href="/ask">就这篇内容提问</a>
+  <a class="chip" href="/">返回概览</a>
+</div>
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}人工复核{% endblock %}
+{% block body %}
+
+<header class="head">
+  <div class="eyebrow">Review</div>
+  <h1>待人工复核队列</h1>
+  <p class="lead">
+    机器只负责标记，不替人裁决。冲突、过期、缺摘录都会进这张表，
+    处理完再回到景区页确认字段收敛为一个取值。
+  </p>
+</header>
+
+{% if queue %}
+<div class="panel panel--flush">
+  <table>
+    <thead>
+      <tr><th>景区</th><th>字段</th><th>取值</th><th>原因</th><th>严重度</th><th>加入时间</th></tr>
+    </thead>
+    <tbody>
+    {% for q in queue %}
+      <tr>
+        <td>
+          {% if q.spot_id %}<a href="/spot/{{ q.spot_id }}">{{ q.spot_name or q.spot_id }}</a>
+          {% else %}<span class="hint">—</span>{% endif %}
+        </td>
+        <td>{{ q.field_label or q.field_name or '—' }}</td>
+        <td><strong>{{ q.field_value or '—' }}</strong></td>
+        <td><span class="tag {{ 'conflict' if q.reason=='conflict' else 'warn' }}">{{ q.reason }}</span></td>
+        <td>
+          <span class="tag {{ 'conflict' if q.severity=='high' else ('warn' if q.severity=='medium' else 'neutral') }}">{{ q.severity }}</span>
+        </td>
+        <td class="mono">{{ q.created_at or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">队列是空的。所有字段都已核验，没有需要人工确认的项。</p>
+{% endif %}
+
+{% endblock %}
